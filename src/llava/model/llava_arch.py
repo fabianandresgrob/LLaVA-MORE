@@ -80,6 +80,21 @@ class LlavaMetaModel:
         else:
             self.config.mm_hidden_size = vision_tower.hidden_size
 
+        # SAE bottleneck: override mm_hidden_size to SAE output dim and load the module
+        use_sae = getattr(model_args, 'use_sae_bottleneck', False)
+        if use_sae:
+            from .sae_bottleneck import SAEBottleneck
+            encode_only = getattr(model_args, 'sae_encode_only', True)
+            sae_path = getattr(model_args, 'sae_checkpoint_path', None)
+            if sae_path is None:
+                raise ValueError("use_sae_bottleneck=True requires --sae_checkpoint_path")
+            sae = SAEBottleneck(sae_path, encode_only=encode_only)
+            self.sae_bottleneck = sae
+            self.config.mm_hidden_size = sae.output_dim
+            self.config.use_sae_bottleneck = True
+            self.config.sae_encode_only = encode_only
+            self.config.sae_checkpoint_path = sae_path
+
         if getattr(self, 'mm_projector', None) is None:
             self.mm_projector = build_vision_projector(self.config)
 
@@ -142,7 +157,10 @@ class LlavaMetaForCausalLM(ABC):
         return self.get_model().get_vision_tower()
 
     def encode_images(self, images):
-        image_features = self.get_model().get_vision_tower()(images) # batch, 576 / 729, vision_model hidden_size
+        image_features = self.get_model().get_vision_tower()(images)  # [B, N, vision_hidden]
+        sae = getattr(self.get_model(), 'sae_bottleneck', None)
+        if sae is not None:
+            image_features = sae(image_features)
         image_features = self.get_model().mm_projector(image_features)
         return image_features
 

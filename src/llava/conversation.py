@@ -432,8 +432,11 @@ Answer the questions.""",
 )
 
 # define the correct tokenizer path
-tokenizer_path= os.getenv("TOKENIZER_PATH")
-llama_tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+tokenizer_path = os.getenv("TOKENIZER_PATH")
+try:
+    llama_tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+except Exception:
+    llama_tokenizer = None
 
 conv_llava_llama_3 = Conversation(
     system="You are a helpful language and vision assistant. " "You are able to understand the visual content that the user provides, " "and assist the user with a variety of tasks using natural language.",
@@ -481,6 +484,17 @@ conv_phi_4_instruct = Conversation(
     sep="<|end|>",
 )
 
+conv_qwen3 = Conversation(
+    system="<|im_start|>system\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.<|im_end|>",
+    roles=("<|im_start|>user\n", "<|im_start|>assistant\n"),
+    version="qwen3",
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.MPT,
+    sep="<|im_end|>",
+    stop_token_ids=[151645, 151643],  # <|im_end|>, <|endoftext|>
+)
+
 conv_llava_gemma_2 = Conversation(
     system="",
     roles=("user", "model"),
@@ -516,7 +530,8 @@ conv_templates = {
     "llama_3_1": conv_llava_llama_3_1,
     "llama_3_1_reasoning": conv_llava_llama_3_1_reasoning,    
     "phi_4": conv_phi_4_instruct,
-    "gemma_2": conv_llava_gemma_2
+    "gemma_2": conv_llava_gemma_2,
+    "qwen3": conv_qwen3,
 }
 
 

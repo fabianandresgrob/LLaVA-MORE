@@ -58,6 +58,14 @@ def get_model(model_args, attn_implementation, training_args, bnb_model_from_pre
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
+    elif model_args.model_architecture == "qwen3":
+        model = LlavaQwen3ForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=training_args.cache_dir,
+            attn_implementation=attn_implementation,
+            torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+            **bnb_model_from_pretrained_args
+        )
     else:
         model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
@@ -77,6 +85,14 @@ def get_tokenizer(model_args, model, training_args):
             cache_dir=training_args.cache_dir,
             model_max_length=training_args.model_max_length,
             padding_side="right"
+        )
+    elif model_args.model_architecture == "qwen3":
+        tokenizer = transformers.AutoTokenizer.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=training_args.cache_dir,
+            model_max_length=training_args.model_max_length,
+            padding_side="right",
+            use_fast=True,
         )
     else:
         tokenizer = transformers.AutoTokenizer.from_pretrained(
@@ -102,6 +118,9 @@ def get_tokenizer(model_args, model, training_args):
         tokenizer.pad_token_id = 0
     elif model_args.model_architecture == "phi_4":
         tokenizer.pad_token = tokenizer.unk_token
+    elif model_args.model_architecture == "qwen3":
+        # Qwen3 has no unk token; use eos (<|endoftext|>, id=151643) as pad
+        tokenizer.pad_token = tokenizer.eos_token
 
     else:
         # for all the version of llama 3 not expand the dictionary with unk token

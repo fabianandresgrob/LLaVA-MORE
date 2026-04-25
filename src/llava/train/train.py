@@ -71,8 +71,14 @@ class ModelArguments:
     siglip: bool = field(default=False)
     model_architecture: Optional[str] = field(default="gemma_2",
                                           metadata={"help": "Define the LLaVA architecture of the model.",
-                                            "choices": ["gemma_2", "phi_4", "llama_3_1", "llama_3", "mpt", "None"]
+                                            "choices": ["gemma_2", "phi_4", "llama_3_1", "llama_3", "mpt", "qwen3", "None"]
                                         })
+    use_sae_bottleneck: bool = field(default=False,
+                                     metadata={"help": "Insert a frozen SAE between CLIP and the projector."})
+    sae_encode_only: bool = field(default=True,
+                                  metadata={"help": "Use SAE encode-only mode (8192d sparse) instead of enc+dec (1024d)."})
+    sae_checkpoint_path: Optional[str] = field(default=None,
+                                               metadata={"help": "Path to ae.pt or its parent directory."})
 
 
 @dataclass
