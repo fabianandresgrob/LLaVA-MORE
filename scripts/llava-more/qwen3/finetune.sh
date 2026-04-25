@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=finetune-qwen3
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=288
+#SBATCH --mem=256G
 #SBATCH --time=24:00:00
 #SBATCH --partition=booster
 #SBATCH --account=taco-vlm
@@ -37,28 +38,34 @@ export TRANSFORMERS_OFFLINE=1
 export HF_DATASETS_OFFLINE=1
 export WANDB_MODE=offline
 
-mkdir -p logs
+mkdir -p "${REPO_PATH}/logs"
 
 # ---- Paths ----
 MODEL_BASE="$PROJECT/grob1/models/Qwen3-${MODEL_SIZE}"
 VISION_TOWER="$PROJECT/grob1/models/clip-vit-large-patch14-336"
 PROJECTOR_PATH="$SCRATCH/grob1/llava-more/checkpoints/qwen3-${MODEL_SIZE}-pretrain/mm_projector.bin"
 
-DATA_PATH="$PROJECT/grob1/data/llava/llava_v1_5_mix665k.json"
-IMAGE_FOLDER="$PROJECT/grob1/data/llava/images"
+DATA_PATH="$SCRATCH/grob1/llava-data/llava_v1_5_mix665k.json"
+IMAGE_FOLDER="$SCRATCH/grob1/llava-data/images"
 
+# SAE checkpoint: update this to the actual ae.pt path once training completes
+# Expected location after sae training: $SCRATCH/grob1/sae/<dataset>_clip_l22/checkpoints/.../trainer_0/ae.pt
 SAE_CHECKPOINT="$SCRATCH/grob1/sae/imagenet_clip_l22/checkpoints/imagenet_train_batch_top_k_20_x8/trainer_0/ae.pt"
 
 if [[ "${USE_SAE}" == "true" ]]; then
     RUN_NAME="qwen3-${MODEL_SIZE}-sae-enc-only"
-    OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/${RUN_NAME}"
     SAE_ARGS="--use_sae_bottleneck True --sae_encode_only True --sae_checkpoint_path ${SAE_CHECKPOINT}"
 else
     RUN_NAME="qwen3-${MODEL_SIZE}-baseline"
-    OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/${RUN_NAME}"
     SAE_ARGS=""
 fi
+
+OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/${RUN_NAME}"
 # ---------------
+
+# Redirect SLURM logs now that we know the repo path
+exec > "${REPO_PATH}/logs/${RUN_NAME}_${SLURM_JOB_ID}.out" \
+     2>"${REPO_PATH}/logs/${RUN_NAME}_${SLURM_JOB_ID}.err"
 
 export TOKENIZER_PATH="${MODEL_BASE}"
 
@@ -70,6 +77,9 @@ export OMP_NUM_THREADS=1
 echo "=== Stage 2: Instruction tuning — ${RUN_NAME} ==="
 echo "MASTER_ADDR=${MASTER_ADDR}  MASTER_PORT=${MASTER_PORT}"
 echo "SAE: ${USE_SAE}"
+echo "Data:      ${DATA_PATH}"
+echo "Projector: ${PROJECTOR_PATH}"
+echo "Output:    ${OUTPUT_DIR}"
 
 torchrun \
     --nnodes=1 --nproc-per-node=4 \

@@ -486,7 +486,7 @@ conv_phi_4_instruct = Conversation(
 
 conv_qwen3 = Conversation(
     system="<|im_start|>system\nYou are a helpful language and vision assistant. You are able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language.<|im_end|>",
-    roles=("<|im_start|>user\n", "<|im_start|>assistant\n"),
+    roles=("<|im_start|>user\n", "<|im_start|>assistant\n<think>\n\n</think>\n\n"),
     version="qwen3",
     messages=(),
     offset=0,

@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=pretrain-qwen3
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=288
+#SBATCH --mem=256G
 #SBATCH --time=12:00:00
 #SBATCH --partition=booster
 #SBATCH --account=taco-vlm
@@ -30,14 +31,18 @@ export TRANSFORMERS_OFFLINE=1
 export HF_DATASETS_OFFLINE=1
 export WANDB_MODE=offline
 
-mkdir -p logs
+mkdir -p "${REPO_PATH}/logs"
+
+# Redirect SLURM logs now that we know the repo path
+exec > "${REPO_PATH}/logs/pretrain-qwen3-${MODEL_SIZE}_${SLURM_JOB_ID}.out" \
+     2>"${REPO_PATH}/logs/pretrain-qwen3-${MODEL_SIZE}_${SLURM_JOB_ID}.err"
 
 # ---- Paths ----
 MODEL_BASE="$PROJECT/grob1/models/Qwen3-${MODEL_SIZE}"
 VISION_TOWER="$PROJECT/grob1/models/clip-vit-large-patch14-336"
 
-DATA_PATH="$PROJECT/grob1/data/llava/LLaVA-CC3M-Pretrain-595K/chat.json"
-IMAGE_FOLDER="$PROJECT/grob1/data/llava/LLaVA-CC3M-Pretrain-595K/images"
+DATA_PATH="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/chat.json"
+IMAGE_FOLDER="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/images"
 
 OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/qwen3-${MODEL_SIZE}-pretrain"
 # ---------------
@@ -51,6 +56,8 @@ export OMP_NUM_THREADS=1
 
 echo "=== Stage 1: Projector pretrain — Qwen3-${MODEL_SIZE} ==="
 echo "MASTER_ADDR=${MASTER_ADDR}  MASTER_PORT=${MASTER_PORT}"
+echo "Data:   ${DATA_PATH}"
+echo "Output: ${OUTPUT_DIR}"
 
 torchrun \
     --nnodes=1 --nproc-per-node=4 \
