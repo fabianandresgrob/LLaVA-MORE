@@ -82,8 +82,8 @@ exec > "${REPO_PATH}/logs/${RUN_NAME}_${SLURM_JOB_ID}.out" \
 # ---- Paths ----
 MODEL_BASE="Qwen/Qwen3-${MODEL_SIZE}"
 VISION_TOWER="openai/clip-vit-large-patch14-336"
-DATA_PATH="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/chat.json"
-IMAGE_FOLDER="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/images"
+DATA_PATH="$SCRATCH/grob1/llava_data/LLaVA-CC3M-Pretrain-595K/chat.json"
+IMAGE_FOLDER="$SCRATCH/grob1/llava_data/LLaVA-CC3M-Pretrain-595K/images"
 # ---------------
 
 export TOKENIZER_PATH="${MODEL_BASE}"

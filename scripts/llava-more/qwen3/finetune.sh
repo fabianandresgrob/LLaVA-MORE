@@ -58,8 +58,8 @@ mkdir -p "${REPO_PATH}/logs"
 MODEL_BASE="Qwen/Qwen3-${MODEL_SIZE}"
 VISION_TOWER="openai/clip-vit-large-patch14-336"
 
-DATA_PATH="$SCRATCH/grob1/llava-data/llava_v1_5_mix665k.json"
-IMAGE_FOLDER="$SCRATCH/grob1/llava-data/images"
+DATA_PATH="$SCRATCH/grob1/llava_data/llava_v1_5_mix665k.json"
+IMAGE_FOLDER="$SCRATCH/grob1/llava_data"
 
 SAE_BASE="$SCRATCH/grob1/sae"
 
