@@ -69,6 +69,7 @@ export CUDA_HOME=/e/software/default/stages/2026/software/CUDA/13
 export PATH="${CUDA_HOME}/bin:${PATH}"
 echo "CUDA_HOME=${CUDA_HOME}"
 export PYTHONPATH=.
+export HF_HOME=/e/scratch/taco-vlm/grob1/.cache/huggingface
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export HF_DATASETS_OFFLINE=1
@@ -79,8 +80,8 @@ exec > "${REPO_PATH}/logs/${RUN_NAME}_${SLURM_JOB_ID}.out" \
      2>"${REPO_PATH}/logs/${RUN_NAME}_${SLURM_JOB_ID}.err"
 
 # ---- Paths ----
-MODEL_BASE="$PROJECT/grob1/models/Qwen3-${MODEL_SIZE}"
-VISION_TOWER="$PROJECT/grob1/models/clip-vit-large-patch14-336"
+MODEL_BASE="Qwen/Qwen3-${MODEL_SIZE}"
+VISION_TOWER="openai/clip-vit-large-patch14-336"
 DATA_PATH="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/chat.json"
 IMAGE_FOLDER="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/images"
 # ---------------
