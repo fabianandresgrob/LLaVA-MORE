@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import AutoImageProcessor, AutoModel, AutoConfig, ViTFeatureExtractor, ViTForImageClassification
+from transformers import AutoImageProcessor, AutoModel, AutoConfig, ViTImageProcessor, ViTForImageClassification
 
 
 class ViTVisionTower(nn.Module):
@@ -25,7 +25,7 @@ class ViTVisionTower(nn.Module):
             print('{} is already loaded, `load_model` called again, skipping.'.format(self.vision_tower_name))
             return
 
-        self.image_processor = ViTFeatureExtractor.from_pretrained(self.vision_tower_name)
+        self.image_processor = ViTImageProcessor.from_pretrained(self.vision_tower_name)
         self.vision_tower = ViTForImageClassification.from_pretrained(self.vision_tower_name, device_map=device_map)
         self.vision_tower.classifier = nn.Identity()
         self.vision_tower.requires_grad_(False)
