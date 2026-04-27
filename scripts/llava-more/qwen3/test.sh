@@ -108,7 +108,7 @@ torchrun \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
-    --evaluation_strategy no \
+    --eval_strategy no \
     --save_strategy no \
     --logging_steps 1 \
     --tf32 True \
