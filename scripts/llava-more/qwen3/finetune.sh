@@ -85,6 +85,15 @@ case "${SAE_MODE}" in
 esac
 
 OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/${RUN_NAME}"
+
+# Auto-resume from the latest checkpoint if one exists
+RESUME_ARG=""
+if [ -d "${OUTPUT_DIR}" ]; then
+    LAST_CKPT=$(ls -d "${OUTPUT_DIR}"/checkpoint-* 2>/dev/null | sort -t- -k2 -n | tail -n1)
+    if [ -n "${LAST_CKPT}" ]; then
+        RESUME_ARG="--resume_from_checkpoint ${LAST_CKPT}"
+    fi
+fi
 # ---------------
 
 # Redirect SLURM logs now that we know the repo path
@@ -104,6 +113,7 @@ echo "SAE mode: ${SAE_MODE:-none}  dataset: ${SAE_DATASET:-n/a}"
 echo "Data:      ${DATA_PATH}"
 echo "Projector: ${PROJECTOR_PATH}"
 echo "Output:    ${OUTPUT_DIR}"
+echo "Resume:    ${RESUME_ARG:-none}"
 
 torchrun \
     --nnodes=1 --nproc-per-node=4 \
@@ -133,8 +143,8 @@ torchrun \
     --gradient_accumulation_steps 4 \
     --eval_strategy no \
     --save_strategy steps \
-    --save_steps 50000 \
-    --save_total_limit 1 \
+    --save_steps 2000 \
+    --save_total_limit 2 \
     --learning_rate 2e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
@@ -147,6 +157,7 @@ torchrun \
     --lazy_preprocess True \
     --report_to wandb \
     --run_name "${RUN_NAME}" \
-    ${SAE_ARGS}
+    ${SAE_ARGS} \
+    ${RESUME_ARG}
 
 echo "=== Done. Checkpoint at ${OUTPUT_DIR} ==="
