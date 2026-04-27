@@ -9,9 +9,15 @@ from transformers.trainer import (
     is_sagemaker_mp_enabled,
     get_parameter_names,
     has_length,
-    ALL_LAYERNORM_LAYERS,
     logger,
 )
+try:
+    from transformers.trainer import ALL_LAYERNORM_LAYERS
+except ImportError:
+    try:
+        from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
+    except ImportError:
+        ALL_LAYERNORM_LAYERS = [nn.LayerNorm]
 from typing import List, Optional
 
 
