@@ -42,10 +42,8 @@ REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
 source "${VENV_PATH}/activate.sh"
 cd "${REPO_PATH}"
 
-if [[ -z "${CUDA_HOME}" ]]; then
-    export CUDA_HOME=$(python3 -c \
-        "from torch.utils.cpp_extension import CUDA_HOME; print(CUDA_HOME or '')" 2>/dev/null)
-fi
+export CUDA_HOME=/e/software/default/stages/2026/software/CUDA/13
+export PATH="${CUDA_HOME}/bin:${PATH}"
 echo "CUDA_HOME=${CUDA_HOME}"
 export PYTHONPATH=.
 export HF_HUB_OFFLINE=1
