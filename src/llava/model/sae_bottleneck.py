@@ -72,7 +72,10 @@ class SAEBottleneck(nn.Module):
             ae_path = checkpoint_path
 
         logger.info(f"Loading SAE from {ae_path}")
-        return BatchTopKSAE.from_pretrained(ae_path)
+        sae = BatchTopKSAE.from_pretrained(ae_path)
+        for param in sae.parameters():
+            param.data = param.data.contiguous()
+        return sae
 
     @property
     def output_dim(self) -> int:
