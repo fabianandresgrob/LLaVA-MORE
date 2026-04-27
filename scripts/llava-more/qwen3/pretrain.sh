@@ -90,8 +90,9 @@ export TOKENIZER_PATH="${MODEL_BASE}"
 
 IFS=',' read -r -a nodelist <<<$SLURM_NODELIST
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT=$(comm -23 <(seq 5000 6000 | sort) <(ss -Htan | awk '{print $4}' | cut -d':' -f2 | sort -u) | shuf | head -n 1)
+export MASTER_PORT=${PRETRAIN_PORT:-$(comm -23 <(seq 5000 6000 | sort) <(ss -Htan | awk '{print $4}' | cut -d':' -f2 | sort -u) | shuf | head -n 1)}
 export OMP_NUM_THREADS=1
+NPROC=${PRETRAIN_NPROC:-4}
 
 echo "=== Stage 1: Projector pretrain — ${RUN_NAME} ==="
 echo "MASTER_ADDR=${MASTER_ADDR}  MASTER_PORT=${MASTER_PORT}"
@@ -100,7 +101,7 @@ echo "Data:        ${DATA_PATH}"
 echo "Output:      ${OUTPUT_DIR}"
 
 torchrun \
-    --nnodes=1 --nproc-per-node=4 \
+    --nnodes=1 --nproc-per-node=${NPROC} \
     --rdzv-endpoint="${MASTER_ADDR}:${MASTER_PORT}" \
     --rdzv-id="${SLURM_JOB_NAME}" \
     --rdzv-backend=c10d \
