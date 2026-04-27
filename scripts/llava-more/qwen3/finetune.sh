@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=288
 #SBATCH --mem=256G
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --partition=booster
 #SBATCH --account=taco-vlm
 
