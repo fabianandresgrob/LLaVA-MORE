@@ -54,7 +54,7 @@ exec > "${REPO_PATH}/logs/test-qwen3-${MODEL_SIZE}_${SLURM_JOB_ID}.out" \
 MODEL_BASE="Qwen/Qwen3-${MODEL_SIZE}"
 VISION_TOWER="openai/clip-vit-large-patch14-336"
 DATA_PATH="$SCRATCH/grob1/llava_data/LLaVA-Pretrain/blip_laion_cc_sbu_558k.json"
-IMAGE_FOLDER="$SCRATCH/grob1/llava_data/LLaVA-Pretrain/images"
+IMAGE_FOLDER="$SCRATCH/grob1/llava_data/LLaVA-Pretrain"
 SAE_BASE="$SCRATCH/grob1/sae"
 
 case "${SAE_MODE}" in
