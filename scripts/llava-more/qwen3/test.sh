@@ -34,7 +34,18 @@ REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
 source "${VENV_PATH}/activate.sh"
 cd "${REPO_PATH}"
 
-export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
+if [[ -z "${CUDA_HOME}" ]]; then
+    if [[ -n "${CUDA_PATH}" && -d "${CUDA_PATH}" ]]; then
+        export CUDA_HOME="${CUDA_PATH}"
+    elif command -v nvcc &>/dev/null; then
+        export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
+    else
+        for _p in /usr/local/cuda /usr/local/cuda-12 /usr/local/cuda-11; do
+            [[ -d "${_p}" ]] && { export CUDA_HOME="${_p}"; break; }
+        done
+    fi
+fi
+echo "CUDA_HOME=${CUDA_HOME}"
 export PYTHONPATH=.
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
