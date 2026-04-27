@@ -79,54 +79,50 @@ submit_dep() {
     echo "${job_id}"
 }
 
-pair() {
-    local mode=$1 dataset=$2
-    local pt_id ft_id
-    pt_id=$(submit \
-        "pretrain ${mode} ${dataset}" \
-        "${SCRIPT_DIR}/pretrain.sh" "${MODEL_SIZE}" "--sae-${mode}" "${dataset}")
-    ft_id=$(submit_dep \
-        "finetune ${mode} ${dataset}" "${pt_id}" \
-        "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-${mode}" "${dataset}")
+finetune_after() {
+    local mode=$1 dataset=$2 dep=$3
+    submit_dep \
+        "finetune ${mode} ${dataset}" "${dep}" \
+        "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-${mode}" "${dataset}"
 }
 
 # ============================================================
-# Submit all pairs (pretrains run in parallel immediately;
-# finetunes queue behind their own pretrain)
+# Stage 1: 2 batch nodes cover all 7 pretrain configs.
+#   Slot 0: baseline + imagenet ×2 + cc3m_laion-enconly  (4 runs)
+#   Slot 1: cc3m_laion-encdec [+ llava_ov ×2]            (1–3 runs)
+#
+# Stage 2: each finetune waits for BOTH batch nodes to finish
+# (its projector is guaranteed to exist once the relevant slot is done,
+# but using afterok:ID0:ID1 is simpler than per-projector tracking).
 # ============================================================
-echo "--- Baseline ---"
-PT_BASE=$(submit \
-    "pretrain baseline" \
-    "${SCRIPT_DIR}/pretrain.sh" "${MODEL_SIZE}")
-submit_dep \
-    "finetune baseline" "${PT_BASE}" \
-    "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}"
+echo "--- Stage 1: submitting 2 pretrain-batch nodes ---"
+PT_SLOT0=$(submit \
+    "pretrain-batch slot0" \
+    "${SCRIPT_DIR}/pretrain_batch.sh" "${MODEL_SIZE}" "0" "${LLAVA_OV_READY}")
+PT_SLOT1=$(submit \
+    "pretrain-batch slot1" \
+    "${SCRIPT_DIR}/pretrain_batch.sh" "${MODEL_SIZE}" "1" "${LLAVA_OV_READY}")
+
+# Both slots must finish before any finetune starts
+PT_DEP="${PT_SLOT0}:${PT_SLOT1}"
 
 echo ""
-echo "--- ImageNet SAE ---"
+echo "--- Stage 2: finetunes (after ${PT_DEP}) ---"
+submit_dep "finetune baseline"           "${PT_DEP}" "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}"
+
 if [[ "${IMAGENET_OK}" == "1" ]]; then
-    pair enconly imagenet
-    pair encdec  imagenet
-else
-    echo "  [SKIP] imagenet SAE not found"
+    submit_dep "finetune enconly imagenet"   "${PT_DEP}" "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-enconly" "imagenet"
+    submit_dep "finetune encdec  imagenet"   "${PT_DEP}" "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-encdec"  "imagenet"
 fi
 
-echo ""
-echo "--- CC3M+LAION SAE ---"
 if [[ "${CC3M_OK}" == "1" ]]; then
-    pair enconly cc3m_laion
-    pair encdec  cc3m_laion
-else
-    echo "  [SKIP] cc3m_laion SAE not found"
+    submit_dep "finetune enconly cc3m_laion" "${PT_DEP}" "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-enconly" "cc3m_laion"
+    submit_dep "finetune encdec  cc3m_laion" "${PT_DEP}" "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-encdec"  "cc3m_laion"
 fi
 
-echo ""
-echo "--- LLaVA-OV SAE ---"
 if [[ "${LLAVOV_OK}" == "1" ]]; then
-    pair enconly llava_ov
-    pair encdec  llava_ov
-else
-    echo "  [SKIP] llava_ov SAE not ready (rerun with LLAVA_OV_READY=1)"
+    submit_dep "finetune enconly llava_ov"   "${PT_DEP}" "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-enconly" "llava_ov"
+    submit_dep "finetune encdec  llava_ov"   "${PT_DEP}" "${SCRIPT_DIR}/finetune.sh" "${MODEL_SIZE}" "--sae-encdec"  "llava_ov"
 fi
 
 echo ""
