@@ -11,20 +11,30 @@
 #SBATCH --account=taco-vlm
 
 # Stage 2: full instruction tuning (projector + LLM unfrozen, vision encoder frozen).
-# Usage: sbatch finetune.sh <model_size> [--sae]
-# model_size: 1.7B | 4B | 8B
-# --sae flag: enable SAE encode-only bottleneck
+# Usage: sbatch finetune.sh <model_size> [MODE [DATASET]]
+# model_size:  1.7B | 4B | 8B
+# MODE:
+#   (none)                  baseline, no SAE
+#   --sae-enconly DATASET   SAE encode-only  (8192d projector from pretrain-enconly)
+#   --sae-encdec  DATASET   SAE encode+dec   (1024d projector from pretrain-baseline)
+#   --sae                   legacy: enc-only with imagenet SAE (backward compat)
+# DATASET: imagenet | cc3m_laion | llava_ov
 # Examples:
-#   sbatch finetune.sh 4B           # baseline
-#   sbatch finetune.sh 4B --sae     # SAE encode-only variant
+#   sbatch finetune.sh 4B
+#   sbatch finetune.sh 4B --sae-enconly imagenet
+#   sbatch finetune.sh 4B --sae-encdec  cc3m_laion
 
 set -e
 
 MODEL_SIZE=${1:-"4B"}
-USE_SAE=false
-if [[ "${2}" == "--sae" ]]; then
-    USE_SAE=true
-fi
+SAE_MODE=""    # enconly | encdec | ""
+SAE_DATASET="" # imagenet | cc3m_laion | llava_ov
+
+case "${2}" in
+    --sae-enconly) SAE_MODE="enconly"; SAE_DATASET="${3}" ;;
+    --sae-encdec)  SAE_MODE="encdec";  SAE_DATASET="${3}" ;;
+    --sae)         SAE_MODE="enconly"; SAE_DATASET="imagenet" ;; # legacy
+esac
 
 VENV_PATH="$PROJECT/grob1/LLaVA/sc_venv_template"
 REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
@@ -32,6 +42,7 @@ REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
 source "${VENV_PATH}/activate.sh"
 cd "${REPO_PATH}"
 
+export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 export PYTHONPATH=.
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
@@ -43,22 +54,32 @@ mkdir -p "${REPO_PATH}/logs"
 # ---- Paths ----
 MODEL_BASE="$PROJECT/grob1/models/Qwen3-${MODEL_SIZE}"
 VISION_TOWER="$PROJECT/grob1/models/clip-vit-large-patch14-336"
-PROJECTOR_PATH="$SCRATCH/grob1/llava-more/checkpoints/qwen3-${MODEL_SIZE}-pretrain/mm_projector.bin"
 
 DATA_PATH="$SCRATCH/grob1/llava-data/llava_v1_5_mix665k.json"
 IMAGE_FOLDER="$SCRATCH/grob1/llava-data/images"
 
-# SAE checkpoint: update this to the actual ae.pt path once training completes
-# Expected location after sae training: $SCRATCH/grob1/sae/<dataset>_clip_l22/checkpoints/.../trainer_0/ae.pt
-SAE_CHECKPOINT="$SCRATCH/grob1/sae/imagenet_clip_l22/checkpoints/imagenet_train_batch_top_k_20_x8/trainer_0/ae.pt"
+SAE_BASE="$SCRATCH/grob1/sae"
 
-if [[ "${USE_SAE}" == "true" ]]; then
-    RUN_NAME="qwen3-${MODEL_SIZE}-sae-enc-only"
-    SAE_ARGS="--use_sae_bottleneck True --sae_encode_only True --sae_checkpoint_path ${SAE_CHECKPOINT}"
-else
-    RUN_NAME="qwen3-${MODEL_SIZE}-baseline"
-    SAE_ARGS=""
-fi
+# ---- Resolve run name, projector path, and SAE args ----
+case "${SAE_MODE}" in
+    enconly)
+        RUN_NAME="qwen3-${MODEL_SIZE}-sae-${SAE_DATASET}-enconly"
+        PROJECTOR_PATH="$SCRATCH/grob1/llava-more/checkpoints/qwen3-${MODEL_SIZE}-pretrain-${SAE_DATASET}-enconly/mm_projector.bin"
+        SAE_ARGS="--use_sae_bottleneck True --sae_encode_only True \
+            --sae_checkpoint_path ${SAE_BASE}/${SAE_DATASET}_clip_l22/ae.pt"
+        ;;
+    encdec)
+        RUN_NAME="qwen3-${MODEL_SIZE}-sae-${SAE_DATASET}-encdec"
+        PROJECTOR_PATH="$SCRATCH/grob1/llava-more/checkpoints/qwen3-${MODEL_SIZE}-pretrain-${SAE_DATASET}-encdec/mm_projector.bin"
+        SAE_ARGS="--use_sae_bottleneck True --sae_encode_only False \
+            --sae_checkpoint_path ${SAE_BASE}/${SAE_DATASET}_clip_l22/ae.pt"
+        ;;
+    *)
+        RUN_NAME="qwen3-${MODEL_SIZE}-baseline"
+        PROJECTOR_PATH="$SCRATCH/grob1/llava-more/checkpoints/qwen3-${MODEL_SIZE}-pretrain/mm_projector.bin"
+        SAE_ARGS=""
+        ;;
+esac
 
 OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/${RUN_NAME}"
 # ---------------
@@ -76,7 +97,7 @@ export OMP_NUM_THREADS=1
 
 echo "=== Stage 2: Instruction tuning — ${RUN_NAME} ==="
 echo "MASTER_ADDR=${MASTER_ADDR}  MASTER_PORT=${MASTER_PORT}"
-echo "SAE: ${USE_SAE}"
+echo "SAE mode: ${SAE_MODE:-none}  dataset: ${SAE_DATASET:-n/a}"
 echo "Data:      ${DATA_PATH}"
 echo "Projector: ${PROJECTOR_PATH}"
 echo "Output:    ${OUTPUT_DIR}"

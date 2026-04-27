@@ -11,20 +11,59 @@
 #SBATCH --account=taco-vlm
 
 # Stage 1: train the MLP projector only (vision encoder + LLM frozen).
-# Usage: sbatch pretrain.sh <model_size>
-# model_size: 1.7B | 4B | 8B
-# Example: sbatch pretrain.sh 4B
+# Each SAE variant needs its own projector — different SAEs produce different
+# feature distributions even at the same dimensionality.
+#
+# Usage: sbatch pretrain.sh <model_size> [MODE DATASET]
+# model_size:  1.7B | 4B | 8B
+# MODE:        --sae-enconly | --sae-encdec
+# DATASET:     imagenet | cc3m_laion | llava_ov
+#
+# Examples:
+#   sbatch pretrain.sh 4B                           # baseline (1024d projector)
+#   sbatch pretrain.sh 4B --sae-enconly imagenet    # enc-only imagenet SAE (8192d)
+#   sbatch pretrain.sh 4B --sae-encdec  cc3m_laion  # enc+dec cc3m SAE (1024d)
 
 set -e
 
 MODEL_SIZE=${1:-"4B"}
+SAE_MODE=""
+SAE_DATASET=""
+
+case "${2}" in
+    --sae-enconly) SAE_MODE="enconly"; SAE_DATASET="${3}" ;;
+    --sae-encdec)  SAE_MODE="encdec";  SAE_DATASET="${3}" ;;
+esac
 
 VENV_PATH="$PROJECT/grob1/LLaVA/sc_venv_template"
 REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
 
+# ---- Resolve run name and SAE args before redirecting logs ----
+SAE_BASE="$SCRATCH/grob1/sae"
+
+case "${SAE_MODE}" in
+    enconly)
+        RUN_NAME="qwen3-${MODEL_SIZE}-pretrain-${SAE_DATASET}-enconly"
+        SAE_ARGS="--use_sae_bottleneck True --sae_encode_only True \
+            --sae_checkpoint_path ${SAE_BASE}/${SAE_DATASET}_clip_l22/ae.pt"
+        ;;
+    encdec)
+        RUN_NAME="qwen3-${MODEL_SIZE}-pretrain-${SAE_DATASET}-encdec"
+        SAE_ARGS="--use_sae_bottleneck True --sae_encode_only False \
+            --sae_checkpoint_path ${SAE_BASE}/${SAE_DATASET}_clip_l22/ae.pt"
+        ;;
+    *)
+        RUN_NAME="qwen3-${MODEL_SIZE}-pretrain"
+        SAE_ARGS=""
+        ;;
+esac
+
+OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/${RUN_NAME}"
+
 source "${VENV_PATH}/activate.sh"
 cd "${REPO_PATH}"
 
+export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 export PYTHONPATH=.
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
@@ -32,19 +71,14 @@ export HF_DATASETS_OFFLINE=1
 export WANDB_MODE=offline
 
 mkdir -p "${REPO_PATH}/logs"
-
-# Redirect SLURM logs now that we know the repo path
-exec > "${REPO_PATH}/logs/pretrain-qwen3-${MODEL_SIZE}_${SLURM_JOB_ID}.out" \
-     2>"${REPO_PATH}/logs/pretrain-qwen3-${MODEL_SIZE}_${SLURM_JOB_ID}.err"
+exec > "${REPO_PATH}/logs/${RUN_NAME}_${SLURM_JOB_ID}.out" \
+     2>"${REPO_PATH}/logs/${RUN_NAME}_${SLURM_JOB_ID}.err"
 
 # ---- Paths ----
 MODEL_BASE="$PROJECT/grob1/models/Qwen3-${MODEL_SIZE}"
 VISION_TOWER="$PROJECT/grob1/models/clip-vit-large-patch14-336"
-
 DATA_PATH="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/chat.json"
 IMAGE_FOLDER="$SCRATCH/grob1/llava-data/LLaVA-CC3M-Pretrain-595K/images"
-
-OUTPUT_DIR="$SCRATCH/grob1/llava-more/checkpoints/qwen3-${MODEL_SIZE}-pretrain"
 # ---------------
 
 export TOKENIZER_PATH="${MODEL_BASE}"
@@ -54,10 +88,11 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=$(comm -23 <(seq 5000 6000 | sort) <(ss -Htan | awk '{print $4}' | cut -d':' -f2 | sort -u) | shuf | head -n 1)
 export OMP_NUM_THREADS=1
 
-echo "=== Stage 1: Projector pretrain — Qwen3-${MODEL_SIZE} ==="
+echo "=== Stage 1: Projector pretrain — ${RUN_NAME} ==="
 echo "MASTER_ADDR=${MASTER_ADDR}  MASTER_PORT=${MASTER_PORT}"
-echo "Data:   ${DATA_PATH}"
-echo "Output: ${OUTPUT_DIR}"
+echo "SAE mode:    ${SAE_MODE:-none}  dataset: ${SAE_DATASET:-n/a}"
+echo "Data:        ${DATA_PATH}"
+echo "Output:      ${OUTPUT_DIR}"
 
 torchrun \
     --nnodes=1 --nproc-per-node=4 \
@@ -98,6 +133,7 @@ torchrun \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to wandb \
-    --run_name "qwen3-${MODEL_SIZE}-pretrain"
+    --run_name "${RUN_NAME}" \
+    ${SAE_ARGS}
 
 echo "=== Done. Projector at ${OUTPUT_DIR}/mm_projector.bin ==="

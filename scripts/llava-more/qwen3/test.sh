@@ -34,6 +34,7 @@ REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
 source "${VENV_PATH}/activate.sh"
 cd "${REPO_PATH}"
 
+export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
 export PYTHONPATH=.
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
