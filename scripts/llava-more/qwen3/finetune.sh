@@ -43,15 +43,8 @@ source "${VENV_PATH}/activate.sh"
 cd "${REPO_PATH}"
 
 if [[ -z "${CUDA_HOME}" ]]; then
-    if [[ -n "${CUDA_PATH}" && -d "${CUDA_PATH}" ]]; then
-        export CUDA_HOME="${CUDA_PATH}"
-    elif command -v nvcc &>/dev/null; then
-        export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
-    else
-        for _p in /usr/local/cuda /usr/local/cuda-12 /usr/local/cuda-11; do
-            [[ -d "${_p}" ]] && { export CUDA_HOME="${_p}"; break; }
-        done
-    fi
+    export CUDA_HOME=$(python3 -c \
+        "from torch.utils.cpp_extension import CUDA_HOME; print(CUDA_HOME or '')" 2>/dev/null)
 fi
 echo "CUDA_HOME=${CUDA_HOME}"
 export PYTHONPATH=.

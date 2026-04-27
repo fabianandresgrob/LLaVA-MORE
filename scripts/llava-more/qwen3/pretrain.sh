@@ -66,15 +66,8 @@ cd "${REPO_PATH}"
 # DeepSpeed requires CUDA_HOME; on JUWELS/JUPITER it is not set automatically.
 # Try: (1) already set, (2) $CUDA_PATH from module system, (3) nvcc in PATH, (4) common paths.
 if [[ -z "${CUDA_HOME}" ]]; then
-    if [[ -n "${CUDA_PATH}" && -d "${CUDA_PATH}" ]]; then
-        export CUDA_HOME="${CUDA_PATH}"
-    elif command -v nvcc &>/dev/null; then
-        export CUDA_HOME=$(dirname $(dirname $(which nvcc)))
-    else
-        for _p in /usr/local/cuda /usr/local/cuda-12 /usr/local/cuda-11; do
-            [[ -d "${_p}" ]] && { export CUDA_HOME="${_p}"; break; }
-        done
-    fi
+    export CUDA_HOME=$(python3 -c \
+        "from torch.utils.cpp_extension import CUDA_HOME; print(CUDA_HOME or '')" 2>/dev/null)
 fi
 echo "CUDA_HOME=${CUDA_HOME}"
 export PYTHONPATH=.
