@@ -16,15 +16,14 @@
 #
 # Two instances (SLOT=0 and SLOT=1) cover all 7 configurations:
 #   Slot 0: baseline + imagenet-enconly + imagenet-encdec + cc3m_laion-enconly
-#   Slot 1: cc3m_laion-encdec [+ llava_ov-enconly + llava_ov-encdec]
+#   Slot 1: cc3m_laion-encdec [+ llava_ov-enconly + llava_ov-encdec] (if SAE exists)
 #
-# Usage: sbatch pretrain_batch.sh <MODEL_SIZE> <SLOT> [LLAVA_OV_READY]
+# Usage: sbatch pretrain_batch.sh <MODEL_SIZE> <SLOT>
 
 set -e
 
 MODEL_SIZE=${1:-"4B"}
 SLOT=${2:-0}
-LLAVA_OV_READY=${3:-0}
 
 VENV_PATH="$PROJECT/grob1/LLaVA/sc_venv_template"
 REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
@@ -45,7 +44,7 @@ mkdir -p "${REPO_PATH}/logs"
 exec > "${REPO_PATH}/logs/pretrain-batch-${MODEL_SIZE}-slot${SLOT}_${SLURM_JOB_ID}.out" \
      2>"${REPO_PATH}/logs/pretrain-batch-${MODEL_SIZE}-slot${SLOT}_${SLURM_JOB_ID}.err"
 
-echo "=== pretrain_batch MODEL_SIZE=${MODEL_SIZE} SLOT=${SLOT} LLAVA_OV_READY=${LLAVA_OV_READY} ==="
+echo "=== pretrain_batch MODEL_SIZE=${MODEL_SIZE} SLOT=${SLOT} ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 # Build list of (args...) for this slot
@@ -57,10 +56,8 @@ if [[ "${SLOT}" == "0" ]]; then
     [[ -f "${SAE_BASE}/cc3m_laion_clip_l22/ae.pt" ]] && CONFIGS+=("--sae-enconly cc3m_laion")
 else
     [[ -f "${SAE_BASE}/cc3m_laion_clip_l22/ae.pt" ]] && CONFIGS+=("--sae-encdec  cc3m_laion")
-    if [[ "${LLAVA_OV_READY}" == "1" && -f "${SAE_BASE}/llava_ov_clip_l22/ae.pt" ]]; then
-        CONFIGS+=("--sae-enconly llava_ov")
-        CONFIGS+=("--sae-encdec  llava_ov")
-    fi
+    [[ -f "${SAE_BASE}/llava_ov_clip_l22/ae.pt"   ]] && CONFIGS+=("--sae-enconly llava_ov")
+    [[ -f "${SAE_BASE}/llava_ov_clip_l22/ae.pt"   ]] && CONFIGS+=("--sae-encdec  llava_ov")
 fi
 
 echo "Configs to run (${#CONFIGS[@]}):"

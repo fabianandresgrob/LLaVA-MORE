@@ -12,22 +12,19 @@
 #   pretrain-imagenet-encdec       → finetune-imagenet-encdec
 #   pretrain-cc3m_laion-enconly    → finetune-cc3m_laion-enconly
 #   pretrain-cc3m_laion-encdec     → finetune-cc3m_laion-encdec
-#   pretrain-llava_ov-enconly      → finetune-llava_ov-enconly    [if LLAVA_OV_READY=1]
-#   pretrain-llava_ov-encdec       → finetune-llava_ov-encdec     [if LLAVA_OV_READY=1]
+#   pretrain-llava_ov-enconly      → finetune-llava_ov-enconly    [if SAE exists]
+#   pretrain-llava_ov-encdec       → finetune-llava_ov-encdec     [if SAE exists]
 #
 # Usage:
-#   bash launch_sweep.sh [MODEL_SIZE] [LLAVA_OV_READY]
-#   MODEL_SIZE:     1.7B | 4B | 8B  (default: 4B)
-#   LLAVA_OV_READY: 0 | 1           (default: 0)
+#   bash launch_sweep.sh [MODEL_SIZE]
+#   MODEL_SIZE: 1.7B | 4B | 8B  (default: 4B)
 #
 # Examples:
-#   bash launch_sweep.sh 4B 0   # 5 pretrain + 5 finetune = 10 jobs
-#   bash launch_sweep.sh 4B 1   # 7 pretrain + 7 finetune = 14 jobs
+#   bash launch_sweep.sh 4B   # 5–7 pretrain + 5–7 finetune depending on SAEs present
 
 set -e
 
 MODEL_SIZE=${1:-"4B"}
-LLAVA_OV_READY=${2:-0}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -40,7 +37,6 @@ SAE_LLAVA_OV="${SAE_BASE}/llava_ov_clip_l22/ae.pt"
 
 echo "============================================================"
 echo " LLaVA-MORE Sweep — Qwen3-${MODEL_SIZE}"
-echo " LLaVA-OV included: ${LLAVA_OV_READY}"
 echo "============================================================"
 
 # Check which SAE checkpoints are available
@@ -53,12 +49,9 @@ check_sae() {
     return 0
 }
 
-IMAGENET_OK=1; check_sae "${SAE_IMAGENET}" "imagenet" || IMAGENET_OK=0
-CC3M_OK=1;     check_sae "${SAE_CC3M}" "cc3m_laion"  || CC3M_OK=0
-LLAVOV_OK=0
-if [[ "${LLAVA_OV_READY}" == "1" ]]; then
-    check_sae "${SAE_LLAVA_OV}" "llava_ov" && LLAVOV_OK=1
-fi
+IMAGENET_OK=1; check_sae "${SAE_IMAGENET}" "imagenet"   || IMAGENET_OK=0
+CC3M_OK=1;     check_sae "${SAE_CC3M}"     "cc3m_laion" || CC3M_OK=0
+LLAVOV_OK=1;   check_sae "${SAE_LLAVA_OV}" "llava_ov"   || LLAVOV_OK=0
 
 echo ""
 
@@ -98,10 +91,10 @@ finetune_after() {
 echo "--- Stage 1: submitting 2 pretrain-batch nodes ---"
 PT_SLOT0=$(submit \
     "pretrain-batch slot0" \
-    "${SCRIPT_DIR}/pretrain_batch.sh" "${MODEL_SIZE}" "0" "${LLAVA_OV_READY}")
+    "${SCRIPT_DIR}/pretrain_batch.sh" "${MODEL_SIZE}" "0")
 PT_SLOT1=$(submit \
     "pretrain-batch slot1" \
-    "${SCRIPT_DIR}/pretrain_batch.sh" "${MODEL_SIZE}" "1" "${LLAVA_OV_READY}")
+    "${SCRIPT_DIR}/pretrain_batch.sh" "${MODEL_SIZE}" "1")
 
 # Both slots must finish before any finetune starts
 PT_DEP="${PT_SLOT0}:${PT_SLOT1}"
