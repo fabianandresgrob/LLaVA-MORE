@@ -28,7 +28,7 @@ LLAVA_OV_READY=${3:-0}
 
 VENV_PATH="$PROJECT/grob1/LLaVA/sc_venv_template"
 REPO_PATH="$PROJECT/grob1/LLaVA-MORE"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="${REPO_PATH}/scripts/llava-more/qwen3"
 SAE_BASE="$SCRATCH/grob1/sae"
 
 source "${VENV_PATH}/activate.sh"
