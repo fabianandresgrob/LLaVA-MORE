@@ -97,7 +97,7 @@ if [ -d "${OUTPUT_DIR}" ]; then
 fi
 # ---- Model-size dependent batch config (keep effective batch = 128) ----
 case "${MODEL_SIZE}" in
-    14B)
+    8B|14B)
         PER_DEVICE_BATCH=4
         GRAD_ACCUM=8
         ;;
