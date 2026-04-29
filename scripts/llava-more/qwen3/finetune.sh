@@ -95,6 +95,17 @@ if [ -d "${OUTPUT_DIR}" ]; then
         RESUME_ARG="--resume_from_checkpoint ${LAST_CKPT}"
     fi
 fi
+# ---- Model-size dependent batch config (keep effective batch = 128) ----
+case "${MODEL_SIZE}" in
+    14B)
+        PER_DEVICE_BATCH=4
+        GRAD_ACCUM=8
+        ;;
+    *)
+        PER_DEVICE_BATCH=8
+        GRAD_ACCUM=4
+        ;;
+esac
 # ---------------
 
 # Redirect SLURM logs now that we know the repo path
@@ -139,9 +150,9 @@ torchrun \
     --bf16 True \
     --output_dir "${OUTPUT_DIR}" \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size ${PER_DEVICE_BATCH} \
     --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 4 \
+    --gradient_accumulation_steps ${GRAD_ACCUM} \
     --eval_strategy no \
     --save_strategy steps \
     --save_steps 2000 \
