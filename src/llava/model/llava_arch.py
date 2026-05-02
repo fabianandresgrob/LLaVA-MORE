@@ -35,6 +35,13 @@ class LlavaMetaModel:
             self.vision_tower = build_vision_tower(config, delay_load=True)
             self.mm_projector = build_vision_projector(config)
 
+            if getattr(config, "use_sae_bottleneck", False):
+                from .sae_bottleneck import SAEBottleneck
+                self.sae_bottleneck = SAEBottleneck(
+                    config.sae_checkpoint_path,
+                    encode_only=getattr(config, "sae_encode_only", True),
+                )
+
             if 'unpad' in getattr(config, 'mm_patch_merge_type', ''):
                 self.image_newline = nn.Parameter(
                     torch.empty(config.hidden_size, dtype=self.dtype)
