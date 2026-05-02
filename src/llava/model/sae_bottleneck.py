@@ -42,11 +42,16 @@ class SAEBottleneck(nn.Module):
             param.requires_grad = False
         self.sae.eval()
 
+        try:
+            k_str = str(self.sae.k.item())
+            threshold_str = f"{self.sae.threshold.item():.6f}"
+        except RuntimeError:
+            k_str = threshold_str = "<meta>"
         logger.info(
             f"SAE Bottleneck initialized (encode_only={self.encode_only}): "
             f"activation_dim={self.sae.activation_dim}, "
-            f"dict_size={self.sae.dict_size}, k={self.sae.k.item()}, "
-            f"threshold={self.sae.threshold.item():.6f}, "
+            f"dict_size={self.sae.dict_size}, k={k_str}, "
+            f"threshold={threshold_str}, "
             f"output_dim={self.output_dim}"
         )
 
